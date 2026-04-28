@@ -123,9 +123,10 @@ def test_simple_summarize_zh_github_formats_metadata(monkeypatch):
     sections = simple_summarize([], [item], [])
     text = sections["GitHub 熱門趨勢"]
 
-    assert "語言：Python" not in text
-    assert "今日星數：" not in text
-    assert "Codex skills" in text
+    assert "語言：Python" in text
+    assert "今日星數：638" in text
+    assert "累積星數：3,088" in text
+    assert "主題：Codex" in text
 
 
 def test_clean_description_decodes_html_entities():
@@ -164,7 +165,7 @@ def test_simple_summarize_dedupes_repeated_titles(monkeypatch):
     assert text.count("OpenAI：GPT-5.5 / GPT-5.5 Pro 更新") == 1
 
 
-def test_simple_summarize_github_uses_simple_repo_description(monkeypatch):
+def test_simple_summarize_github_uses_metadata_not_simple_description(monkeypatch):
     monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
     item = NewsItem(
         title="microsoft/VibeVoice [Python]",
@@ -174,9 +175,10 @@ def test_simple_summarize_github_uses_simple_repo_description(monkeypatch):
     )
 
     text = simple_summarize([], [item], [])["GitHub 熱門趨勢"]
-    assert "語言：" not in text
-    assert "今日星數：" not in text
-    assert "open-source frontier speech AI project" in text
+    assert "語言：Python" in text
+    assert "今日星數：757" in text
+    assert "累積星數：43,506" in text
+    assert "主題：語音 AI" in text
 
 
 def test_filter_recent_items_keeps_only_last_24_hours():
@@ -233,7 +235,39 @@ def test_build_digest_with_llm_key():
     assert "## digest" not in md  # should not double-wrap
 
 
-# ── RSS collector (mocked network) ───────────────────────────────────────────
+def test_openai_summarizer_hybrid_adds_key_points(monkeypatch):
+    monkeypatch.setattr(openai_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
+    monkeypatch.setattr(openai_summarizer.config, "OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setattr(openai_summarizer.config, "OPENAI_API_KEY", "test-key")
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            return type("Resp", (), {
+                "choices": [type("Choice", (), {"message": type("Msg", (), {"content": "- 重點一\n- 重點二\n- 重點三"})()})]
+            })()
+
+    class _FakeChat:
+        completions = _FakeCompletions()
+
+    class _FakeClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = _FakeChat()
+
+    monkeypatch.setattr(openai_summarizer, "_preflight_openai", lambda api_key: None)
+    monkeypatch.setitem(sys.modules, "openai", type("OpenAIModule", (), {"OpenAI": _FakeClient}))
+
+    item = NewsItem(
+        title="repo [Python]",
+        url="https://example.com/repo",
+        source="GitHub Trending",
+        description="Useful project · 10 stars today ★100",
+    )
+    sections = openai_summarizer.summarize([], [item], [])
+
+    assert "GitHub 熱門趨勢" in sections
+    assert "關鍵重點" in sections
+    assert "今日星數：10" in sections["GitHub 熱門趨勢"]
+    assert sections["關鍵重點"].startswith("- 重點一")
 
 def test_rss_collector_handles_network_error():
     """A failing feed URL should return [] without raising."""

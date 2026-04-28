@@ -13,23 +13,20 @@ logger = logging.getLogger(__name__)
 
 def _system_prompt() -> str:
     return f"""\
-You are a concise tech news curator. You receive raw news items grouped by category
-and produce a tight, readable daily digest in Markdown.
+You are a concise tech news editor.
+You receive raw news items grouped by category and must write only the final
+"關鍵重點" summary bullets for the day.
 
 Language requirement:
-- Write the entire digest in {config.SUMMARY_LANGUAGE}.
-- If source titles are in English, you may keep the title itself, but the summary/context must be in {config.SUMMARY_LANGUAGE}.
+- Write in {config.SUMMARY_LANGUAGE}.
 
 Rules:
-- Use ## for each top-level section heading.
-- Only use items from the last 24 hours; if a section has little news, output fewer bullets instead of padding.
-- Under each section, write 1-5 bullet points with the most interesting items.
-- For GitHub Trending, include at most 5 repositories total.
-- For GitHub bullets: give a very simple repo description in one short sentence, focused on what the repo does.
-- For non-GitHub bullets: keep one concise context sentence, similar to an editor's news brief.
-- Skip duplicates, stale items, or low-signal aggregator placeholders like "Google News".
-- End with a "關鍵重點" section of 3 bullet points summarising the day.
-- Do NOT add any preamble; start directly with the first ## heading.
+- Output exactly 3 bullet points.
+- Each bullet must be one concise sentence.
+- Focus on the most important developments across AI, software, markets, crypto, and world news when available.
+- Do not invent facts not present in the source items.
+- Do not add headings, numbering, or preamble.
+- Start directly with "- ".
 """
 
 
@@ -81,15 +78,19 @@ def summarize(
     ai_items: list[NewsItem],
 ) -> dict[str, str]:
     """
-    Returns a single dict with key "digest" containing the full LLM-written
-    Markdown digest, or falls back to the simple summarizer on failure.
+    Hybrid mode:
+    - base sections come from the deterministic summarizer (stable links/metadata)
+    - OpenAI only writes the final "關鍵重點" bullets
     """
+    from src.summarizer import simple_summarizer
+
+    base_sections = simple_summarizer.summarize(twitter_items, github_items, ai_items)
+
     try:
         from openai import OpenAI  # import here so missing package is not fatal
     except ImportError:
-        logger.warning("openai package not installed; falling back to simple summarizer.")
-        from src.summarizer import simple_summarizer
-        return simple_summarizer.summarize(twitter_items, github_items, ai_items)
+        logger.warning("openai package not installed; returning deterministic digest without key-points summary.")
+        return base_sections
 
     parts: list[str] = []
     if twitter_items:
@@ -100,7 +101,7 @@ def summarize(
         parts.append(_items_to_text("AI News", ai_items))
 
     if not parts:
-        return {"digest": "_No items collected today._"}
+        return base_sections
 
     user_message = "\n\n".join(parts)
 
@@ -116,11 +117,13 @@ def summarize(
                 {"role": "user", "content": user_message},
             ],
             temperature=0.3,
-            max_tokens=2048,
+            max_tokens=300,
         )
-        digest_text = response.choices[0].message.content or ""
-        return {"digest": digest_text}
+        key_points = (response.choices[0].message.content or "").strip()
+        if key_points:
+            section_name = "關鍵重點" if config.SUMMARY_LANGUAGE.lower().startswith(("traditional chinese", "zh", "繁")) else "Key Takeaways"
+            base_sections[section_name] = key_points
+        return base_sections
     except Exception as exc:
-        logger.warning("OpenAI API call failed: %s; falling back to simple summarizer.", _describe_exception(exc))
-        from src.summarizer import simple_summarizer
-        return simple_summarizer.summarize(twitter_items, github_items, ai_items)
+        logger.warning("OpenAI API call failed: %s; returning deterministic digest without key-points summary.", _describe_exception(exc))
+        return base_sections
