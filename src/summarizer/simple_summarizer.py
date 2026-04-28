@@ -189,6 +189,7 @@ def _github_item_to_zh(item: NewsItem) -> tuple[str, str]:
 
 def _ai_item_to_zh(item: NewsItem) -> tuple[str, str]:
     title = _normalize_news_title(item.title)
+    title = _humanize_news_title(title)
     description = _clean_text(item.description)
     description = re.sub(r"\s*&nbsp;\s*", " ", description)
     description = _simplify_ai_description(title, description)
@@ -214,6 +215,11 @@ def _topic_based_brief(title: str) -> str:
 
 def _simplify_ai_description(title: str, description: str) -> str:
     title_brief = _summarize_news_title(title)
+    title_lower = title.lower()
+    if "x money" in title_lower:
+        return "重點：馬斯克的 X Money 支付服務接近正式上線。"
+    if "歐洲多國領導人訪中" in title:
+        return "重點：歐洲多國領導人訪中，但對中關係未明顯改善。"
     if not description:
         return f"重點：{title_brief}" if title_brief else _topic_based_brief(title)
 
@@ -346,10 +352,32 @@ def _is_generic_brief(text: str) -> bool:
     return any(text.startswith(prefix) for prefix in generic_prefixes)
 
 
+def _clean_news_tail(text: str) -> str:
+    text = _clean_text(text)
+    text = re.sub(r"\|\s*[^|]+\s*\|\s*新聞$", "", text)
+    text = re.sub(r"\|\s*[^|]+$", "", text)
+    text = re.sub(r"^分析[:：]", "", text)
+    return text.strip()
+
+
+def _humanize_news_title(title: str) -> str:
+    cleaned = _clean_news_tail(title)
+    lowered = cleaned.lower()
+    if "x money" in lowered and "馬斯克" in cleaned:
+        return "馬斯克的 X Money 支付服務接近正式上線"
+    if "歐洲多國領導人訪問中國" in cleaned and ("不代表關係顯著改善" in cleaned or "未明顯改善" in cleaned):
+        return "歐洲多國領導人訪中，但對中關係未明顯改善"
+    return cleaned
+
+
 def _summarize_news_title(title: str) -> str:
     normalized = _normalize_news_title(title)
     lowered = normalized.lower()
 
+    if "x money" in lowered and "馬斯克" in normalized:
+        return "馬斯克的 X Money 支付服務接近正式上線。"
+    if (normalized.startswith("分析：") and "歐洲多國領導人訪問中國" in normalized) or ("歐洲多國領導人訪中" in normalized and "未明顯改善" in normalized):
+        return "歐洲多國領導人訪中，但對中關係未明顯改善。"
     if "蒸餾" in normalized and ("美國ai技術" in normalized.replace(" ", "").lower() or "美國ai" in normalized.replace(" ", "").lower()):
         return "中國公司透過模型蒸餾大規模竊取美國 AI 技術。"
     if "copilot" in lowered and any(word in normalized for word in ["按量計費", "ai credits", "生效"]):
@@ -357,10 +385,10 @@ def _summarize_news_title(title: str) -> str:
     if "量化交易" in normalized and "ai" in lowered:
         return "量化交易公司正成為 AI 新創與人才的重要孵化來源。"
     if any(word in normalized for word in ["白宮", "烏克蘭", "俄羅斯", "歐盟", "中國", "美國"]):
-        return _shorten_text(normalized, 38)
+        return _shorten_text(_clean_news_tail(normalized), 38)
     if any(word in lowered for word in ["gemini", "openai", "ai", "人工智慧"]):
-        return _shorten_text(normalized, 38)
-    return _shorten_text(normalized, 38)
+        return _shorten_text(_clean_news_tail(normalized), 38)
+    return _shorten_text(_clean_news_tail(normalized), 38)
 
 
 def _should_skip_twitter_item(item: NewsItem) -> bool:

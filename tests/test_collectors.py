@@ -290,6 +290,30 @@ def test_simple_summarize_ai_description_shortens_long_chinese_blurb(monkeypatch
     assert len(text.split("重點：", 1)[1]) < 60
 
 
+def test_simple_summarize_ai_title_gets_humanized_summary(monkeypatch):
+    monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
+    items = [
+        NewsItem(
+            title="Paypal奠基者馬斯克要重回電子金融賽道「X Money」距離正式上線僅差臨門一腳背後有時隔二十多年的輪迴| 謝駒蕥| 新聞",
+            url="https://example.com/x-money",
+            source="AI News / news.google.com",
+            description="",
+        ),
+        NewsItem(
+            title="分析：歐洲多國領導人訪問中國不代表關係顯著改善| 兩岸",
+            url="https://example.com/eu-china",
+            source="AI News / news.google.com",
+            description="",
+        ),
+    ]
+
+    text = simple_summarize([], [], items)["AI 新聞"]
+    assert "重點：馬斯克的 X Money 支付服務接近正式上線。" in text
+    assert "重點：歐洲多國領導人訪中，但對中關係未明顯改善。" in text
+    assert "距離正式上線僅" not in text
+    assert "不代表關係顯著改善| 兩岸" not in text
+
+
 # ── Digest builder ────────────────────────────────────────────────────────────
 
 def test_build_digest_with_sections():
