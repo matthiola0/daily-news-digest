@@ -49,8 +49,13 @@ def _describe_exception(exc: Exception) -> str:
     return " | ".join(parts)
 
 
+def _client_kwargs() -> dict[str, str]:
+    base_url = config.OPENAI_BASE_URL.rstrip("/") if config.OPENAI_BASE_URL else "https://api.openai.com/v1"
+    return {"base_url": base_url}
+
+
 def _preflight_openai(api_key: str) -> None:
-    url = (config.OPENAI_BASE_URL.rstrip("/") + "/models") if config.OPENAI_BASE_URL else "https://api.openai.com/v1/models"
+    url = _client_kwargs()["base_url"].rstrip("/") + "/models"
     try:
         response = requests.get(
             url,
@@ -96,11 +101,7 @@ def summarize(
 
     user_message = "\n\n".join(parts)
 
-    kwargs: dict = {}
-    if config.OPENAI_BASE_URL:
-        kwargs["base_url"] = config.OPENAI_BASE_URL
-
-    client = OpenAI(api_key=config.OPENAI_API_KEY, **kwargs)
+    client = OpenAI(api_key=config.OPENAI_API_KEY, **_client_kwargs())
 
     logger.info("Calling OpenAI-compatible API (model=%s)…", config.OPENAI_MODEL)
     _preflight_openai(config.OPENAI_API_KEY)

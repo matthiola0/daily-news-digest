@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.collectors.base import NewsItem
 from src.collectors.rss_collector import _clean_description
-from src.summarizer import simple_summarizer
+from src.summarizer import openai_summarizer, simple_summarizer
 from src.summarizer.simple_summarizer import summarize as simple_summarize
 from src.digest.builder import build_digest
 
@@ -131,6 +131,16 @@ def test_simple_summarize_zh_github_formats_metadata(monkeypatch):
 def test_clean_description_decodes_html_entities():
     cleaned = _clean_description("AI新聞&nbsp;&nbsp;<br>重點更新", 100)
     assert cleaned == "AI新聞 重點更新"
+
+
+def test_openai_client_uses_explicit_default_base_url_when_config_empty(monkeypatch):
+    monkeypatch.setattr(openai_summarizer.config, "OPENAI_BASE_URL", "")
+    assert openai_summarizer._client_kwargs() == {"base_url": "https://api.openai.com/v1"}
+
+
+def test_openai_client_normalizes_custom_base_url(monkeypatch):
+    monkeypatch.setattr(openai_summarizer.config, "OPENAI_BASE_URL", "https://example.com/v1/")
+    assert openai_summarizer._client_kwargs() == {"base_url": "https://example.com/v1"}
 
 
 # ── Digest builder ────────────────────────────────────────────────────────────
