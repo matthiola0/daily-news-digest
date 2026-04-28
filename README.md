@@ -133,9 +133,11 @@ In your repository go to **Settings → Secrets and variables → Actions**:
 | `DISCORD_WEBHOOK_URL` | Secret | No | Enables Discord posting |
 | `TWITTER_RSS_FEEDS` | Variable | No | Comma-separated RSS URLs |
 | `AI_NEWS_RSS_FEEDS` | Variable | No | Override default AI feed list |
-| `GITHUB_TRENDING_LANGUAGES` | Variable | No | e.g. `python,go` |
+| `DIGEST_GITHUB_TRENDING_LANGUAGES` | Variable | No | e.g. `python,go` |
+| `DIGEST_GITHUB_TRENDING_SINCE` | Variable | No | `daily`, `weekly`, or `monthly` |
 | `OPENAI_MODEL` | Variable | No | Default: `gpt-4o-mini` |
 | `OPENAI_BASE_URL` | Variable | No | For non-OpenAI endpoints |
+| `MAX_ITEMS_PER_SOURCE` | Variable | No | Default: `10` |
 
 ### Manual trigger
 

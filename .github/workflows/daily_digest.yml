@@ -46,8 +46,8 @@ jobs:
           TWITTER_RSS_FEEDS: ${{ vars.TWITTER_RSS_FEEDS }}
           AI_NEWS_RSS_FEEDS: ${{ vars.AI_NEWS_RSS_FEEDS }}
           # GitHub Trending
-          GITHUB_TRENDING_LANGUAGES: ${{ vars.GITHUB_TRENDING_LANGUAGES }}
-          GITHUB_TRENDING_SINCE:     ${{ vars.GITHUB_TRENDING_SINCE || 'daily' }}
+          GITHUB_TRENDING_LANGUAGES: ${{ vars.DIGEST_GITHUB_TRENDING_LANGUAGES }}
+          GITHUB_TRENDING_SINCE:     ${{ vars.DIGEST_GITHUB_TRENDING_SINCE || 'daily' }}
           # Notifications
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           # Tuning
