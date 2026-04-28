@@ -1,0 +1,84 @@
+name: Daily News Digest
+
+# 08:00 Asia/Taipei = UTC+8, so 08:00 - 08:00 = 00:00 UTC
+# Cron: minute hour day-of-month month day-of-week
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 00:00 UTC = 08:00 Asia/Taipei
+  workflow_dispatch:       # allow manual trigger from GitHub UI
+    inputs:
+      dry_run:
+        description: "Print digest to logs instead of saving/uploading"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  contents: write   # needed to commit the digest file back to the repo
+
+jobs:
+  digest:
+    name: Generate digest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run digest pipeline
+        env:
+          # Summarization (optional — leave empty to use fallback)
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL:      ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+          OPENAI_BASE_URL:   ${{ vars.OPENAI_BASE_URL }}
+          # Source feeds (optional — built-in defaults apply when empty)
+          TWITTER_RSS_FEEDS: ${{ vars.TWITTER_RSS_FEEDS }}
+          AI_NEWS_RSS_FEEDS: ${{ vars.AI_NEWS_RSS_FEEDS }}
+          # GitHub Trending
+          GITHUB_TRENDING_LANGUAGES: ${{ vars.GITHUB_TRENDING_LANGUAGES }}
+          GITHUB_TRENDING_SINCE:     ${{ vars.GITHUB_TRENDING_SINCE || 'daily' }}
+          # Notifications
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          # Tuning
+          MAX_ITEMS_PER_SOURCE: ${{ vars.MAX_ITEMS_PER_SOURCE || '10' }}
+          DIGEST_TIMEZONE: "Asia/Taipei"
+        run: |
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            python -m src.main --dry-run
+          else
+            python -m src.main
+          fi
+
+      # Upload the generated digest as a workflow artifact (90-day retention)
+      - name: Upload digest artifact
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ github.run_id }}
+          path: output/digest_*.md
+          retention-days: 90
+
+      # Optionally commit the digest back to the repo under output/
+      - name: Commit digest to repository
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f output/digest_*.md
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "chore: add digest $(date -u +'%Y-%m-%d')"
+            git push
+          fi
