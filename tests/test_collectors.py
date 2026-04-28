@@ -214,6 +214,34 @@ def test_filter_recent_items_skips_google_news_noise():
     assert [item.title for item in result] == ["真新聞"]
 
 
+def test_filter_recent_items_skips_low_signal_news_titles():
+    now = datetime(2026, 4, 28, 15, 0, tzinfo=timezone.utc)
+    low_signal = NewsItem(
+        "法國報紙摘要 - 費加羅報：伊朗戰爭僵局助北京在中美峰會前站優",
+        "https://example.com/low",
+        "AI News / news.google.com",
+        description="重點整理",
+        published=now,
+    )
+    research = NewsItem(
+        "近期研究成果 | 期刊出版〉《近代中國婦女史研究》第46期",
+        "https://example.com/research",
+        "AI News / news.google.com",
+        description="最新期刊",
+        published=now,
+    )
+    real = NewsItem(
+        "GitHub Copilot 方案按量計費、改採 AI Credits，新措施 6/1 起生效",
+        "https://example.com/copilot",
+        "AI News / news.google.com",
+        description="商業模式調整",
+        published=now,
+    )
+
+    result = rss_collector._filter_recent_items([low_signal, research, real], now=now, hours=24)
+    assert [item.title for item in result] == ["GitHub Copilot 方案按量計費、改採 AI Credits，新措施 6/1 起生效"]
+
+
 def test_simple_summarize_ai_description_is_brief(monkeypatch):
     monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
     item = NewsItem(

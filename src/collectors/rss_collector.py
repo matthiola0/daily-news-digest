@@ -60,7 +60,18 @@ def _is_noise_item(item: NewsItem) -> bool:
         return True
     if "comprehensive up-to-date news coverage" in description:
         return True
+    if _is_low_signal_news_title(title):
+        return True
     return False
+
+
+def _is_low_signal_news_title(title: str) -> bool:
+    low_signal_patterns = [
+        r"^法國報紙摘要\b",
+        r"^近期研究成果\b",
+        r"^期刊出版[〉>]?",
+    ]
+    return any(re.search(pattern, title, re.I) for pattern in low_signal_patterns)
 
 
 def _filter_recent_items(
