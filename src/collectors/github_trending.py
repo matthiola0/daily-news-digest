@@ -15,8 +15,8 @@ from src import config
 from src.collectors.base import NewsItem
 
 logger = logging.getLogger(__name__)
-
 TRENDING_BASE = "https://github.com/trending"
+MAX_GITHUB_REPOS = 5
 
 
 @dataclass
@@ -103,6 +103,8 @@ def collect_github_trending() -> list[NewsItem]:
         for repo in repos[: config.MAX_ITEMS_PER_SOURCE]:
             if repo.name in seen:
                 continue
+            if len(all_items) >= MAX_GITHUB_REPOS:
+                return all_items
             seen.add(repo.name)
 
             stars_note = ""

@@ -75,6 +75,7 @@ def _render_section(items: list[NewsItem]) -> str:
 
 def _render_section_zh(items: list[NewsItem], kind: str) -> str:
     lines: list[str] = []
+    seen_titles: set[str] = set()
     for item in items:
         if kind == "twitter":
             title, description = _twitter_item_to_zh(item)
@@ -82,6 +83,10 @@ def _render_section_zh(items: list[NewsItem], kind: str) -> str:
             title, description = _github_item_to_zh(item)
         else:
             title, description = _ai_item_to_zh(item)
+
+        if title in seen_titles:
+            continue
+        seen_titles.add(title)
 
         line = f"- **[{title}]({item.url})**"
         if description:
@@ -171,9 +176,27 @@ def _ai_item_to_zh(item: NewsItem) -> tuple[str, str]:
     title = _normalize_news_title(item.title)
     description = _clean_text(item.description)
     description = re.sub(r"\s*&nbsp;\s*", " ", description)
-    if description:
-        description = _shorten_text(description, 110)
+    description = _simplify_ai_description(title, description)
     return title, description
+
+
+def _simplify_ai_description(title: str, description: str) -> str:
+    if not description:
+        return ""
+
+    normalized_title = _clean_text(title)
+    normalized_description = _clean_text(description)
+
+    if normalized_description.startswith(normalized_title):
+        remainder = normalized_description[len(normalized_title):].strip(" -|｜:：")
+        if remainder and len(remainder) <= 24 and re.search(r"[A-Za-z\u4e00-\u9fff]", remainder):
+            return f"來源：{remainder}。"
+        normalized_description = remainder or normalized_description
+
+    normalized_description = re.sub(r"^(Comprehensive up-to-date news coverage, aggregated from sources all over the world by Google News\.?)+", "", normalized_description, flags=re.I).strip(" -|｜:：")
+    if not normalized_description:
+        return ""
+    return _shorten_text(normalized_description, 70)
 
 
 def _combined_text(item: NewsItem) -> str:

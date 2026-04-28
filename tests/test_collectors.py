@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import sys
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.collectors.base import NewsItem
+from src.collectors import rss_collector
 from src.collectors.rss_collector import _clean_description
 from src.summarizer import openai_summarizer, simple_summarizer
 from src.summarizer.simple_summarizer import summarize as simple_summarize
@@ -143,6 +144,60 @@ def test_openai_client_normalizes_custom_base_url(monkeypatch):
     assert openai_summarizer._client_kwargs() == {"base_url": "https://example.com/v1"}
 
 
+def test_simple_summarize_dedupes_repeated_titles(monkeypatch):
+    monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
+    items = [
+        NewsItem(
+            title="Update: GPT-5.5 and GPT-5.5 Pro are now available in the API.",
+            url="https://example.com/1",
+            source="Twitter / nitter.net",
+            description="OpenAI API update",
+        ),
+        NewsItem(
+            title="Pinned: Update: GPT-5.5 and GPT-5.5 Pro are now available in the API.",
+            url="https://example.com/2",
+            source="Twitter / nitter.net",
+            description="Another wording of the same update",
+        ),
+    ]
+
+    text = simple_summarize(items, [], [])["社群 / Twitter"]
+    assert text.count("OpenAI：GPT-5.5 / GPT-5.5 Pro 更新") == 1
+
+
+def test_filter_recent_items_keeps_only_last_24_hours():
+    now = datetime(2026, 4, 28, 15, 0, tzinfo=timezone.utc)
+    recent = NewsItem("recent", "https://example.com/r", "AI", published=now - timedelta(hours=3))
+    old = NewsItem("old", "https://example.com/o", "AI", published=now - timedelta(hours=30))
+    undated = NewsItem("undated", "https://example.com/u", "AI")
+
+    result = rss_collector._filter_recent_items([recent, old, undated], now=now, hours=24)
+    assert [item.title for item in result] == ["recent"]
+
+
+def test_filter_recent_items_skips_google_news_noise():
+    now = datetime(2026, 4, 28, 15, 0, tzinfo=timezone.utc)
+    noise = NewsItem("Google News", "https://example.com/g", "AI", description="Comprehensive up-to-date news coverage", published=now)
+    real = NewsItem("真新聞", "https://example.com/n", "AI", description="重要更新", published=now)
+
+    result = rss_collector._filter_recent_items([noise, real], now=now, hours=24)
+    assert [item.title for item in result] == ["真新聞"]
+
+
+def test_simple_summarize_ai_description_is_brief(monkeypatch):
+    monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
+    item = NewsItem(
+        title="人工智慧：白宮備忘錄指中國公司通過「蒸餾」活動大規模竊取美國AI技術",
+        url="https://example.com/ai-news",
+        source="AI News / news.google.com",
+        description="人工智慧：白宮備忘錄指中國公司通過「蒸餾」活動大規模竊取美國AI技術 BBC",
+    )
+
+    text = simple_summarize([], [], [item])["AI 新聞"]
+    assert "來源：BBC" in text
+    assert text.count("人工智慧：白宮備忘錄") == 1
+
+
 # ── Digest builder ────────────────────────────────────────────────────────────
 
 def test_build_digest_with_sections():
@@ -235,3 +290,29 @@ def test_github_trending_handles_error():
         from src.collectors.github_trending import collect_github_trending
         items = collect_github_trending()
     assert items == []
+
+
+def test_github_trending_caps_total_items_to_five(monkeypatch):
+    repos = [
+        NewsItem(title=f"repo{i} [Python]", url=f"https://example.com/{i}", source="GitHub Trending", description="desc")
+        for i in range(7)
+    ]
+    monkeypatch.setattr("src.collectors.github_trending._scrape_trending", lambda url: [
+        type("Repo", (), {
+            "name": f"owner/repo{i}",
+            "url": f"https://github.com/owner/repo{i}",
+            "description": "desc",
+            "language": "Python",
+            "stars_today": str(i),
+            "total_stars": str(i * 10),
+        })()
+        for i in range(7)
+    ])
+    monkeypatch.setattr("src.collectors.github_trending.config.GITHUB_TRENDING_LANGUAGES", ["python"])
+    monkeypatch.setattr("src.collectors.github_trending.config.GITHUB_TRENDING_SINCE", "daily")
+    monkeypatch.setattr("src.collectors.github_trending.config.MAX_ITEMS_PER_SOURCE", 10)
+
+    from src.collectors.github_trending import collect_github_trending
+    items = collect_github_trending()
+
+    assert len(items) == 5

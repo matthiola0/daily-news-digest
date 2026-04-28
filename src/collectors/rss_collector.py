@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Optional
 
@@ -37,12 +38,58 @@ def _parse_published(entry) -> Optional[datetime]:
 
 def _clean_description(text: str, max_chars: int) -> str:
     import html
-    import re
 
     text = html.unescape(text)
     text = re.sub(r"<[^>]+>", " ", text)        # strip HTML tags
     text = re.sub(r"\s+", " ", text).strip()
     return text[:max_chars] + "…" if len(text) > max_chars else text
+
+
+def _normalize_title(text: str) -> str:
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    text = re.sub(r"\s*[|｜-]\s*[^|｜-]+$", "", text)
+    return text
+
+
+def _is_noise_item(item: NewsItem) -> bool:
+    title = _normalize_title(item.title)
+    description = _normalize_title(item.description)
+    if title in {"google news", "圖片", "image"}:
+        return True
+    if title == description and title:
+        return True
+    if "comprehensive up-to-date news coverage" in description:
+        return True
+    return False
+
+
+def _filter_recent_items(
+    items: list[NewsItem],
+    *,
+    now: datetime | None = None,
+    hours: int = 24,
+) -> list[NewsItem]:
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=hours)
+    filtered: list[NewsItem] = []
+    seen_titles: set[str] = set()
+
+    for item in sorted(items, key=lambda it: it.published or datetime.min.replace(tzinfo=timezone.utc), reverse=True):
+        if not item.published:
+            continue
+        published = item.published.astimezone(timezone.utc)
+        if published < cutoff:
+            continue
+        if _is_noise_item(item):
+            continue
+
+        normalized_title = _normalize_title(item.title)
+        if normalized_title in seen_titles:
+            continue
+        seen_titles.add(normalized_title)
+        filtered.append(item)
+
+    return filtered
 
 
 def fetch_rss_feed(
@@ -107,7 +154,7 @@ def collect_twitter_feeds() -> list[NewsItem]:
         )
         all_items.extend(items)
         time.sleep(0.5)  # be polite
-    return all_items
+    return _filter_recent_items(all_items)
 
 
 def collect_ai_news_feeds() -> list[NewsItem]:
@@ -123,7 +170,7 @@ def collect_ai_news_feeds() -> list[NewsItem]:
         )
         all_items.extend(items)
         time.sleep(0.5)
-    return all_items
+    return _filter_recent_items(all_items)
 
 
 def _label_from_url(url: str, prefix: str = "") -> str:
