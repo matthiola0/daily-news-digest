@@ -25,7 +25,8 @@ Rules:
 - Only use items from the last 24 hours; if a section has little news, output fewer bullets instead of padding.
 - Under each section, write 1-5 bullet points with the most interesting items.
 - For GitHub Trending, include at most 5 repositories total.
-- Each bullet: bold title as a Markdown link, then one short, simple sentence of context.
+- For GitHub bullets: give a very simple repo description in one short sentence, focused on what the repo does.
+- For non-GitHub bullets: keep one concise context sentence, similar to an editor's news brief.
 - Skip duplicates, stale items, or low-signal aggregator placeholders like "Google News".
 - End with a "關鍵重點" section of 3 bullet points summarising the day.
 - Do NOT add any preamble; start directly with the first ## heading.

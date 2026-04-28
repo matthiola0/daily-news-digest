@@ -149,27 +149,20 @@ def _twitter_item_to_zh(item: NewsItem) -> tuple[str, str]:
 def _github_item_to_zh(item: NewsItem) -> tuple[str, str]:
     title = _clean_text(item.title)
     repo_name = re.sub(r"\s*\[[^\]]+\]\s*$", "", title)
-    language_match = re.search(r"\[([^\]]+)\]\s*$", title)
-    language = language_match.group(1) if language_match else "未知"
 
     desc = _clean_text(item.description)
-    stars_today_match = re.search(r"([\d,]+)\s+stars today", desc, re.I)
-    total_stars_match = re.search(r"★\s*([\d,]+)", desc)
     core_desc = re.split(r"\s+·\s+[\d,]+\s+stars today", desc, maxsplit=1, flags=re.I)[0].strip(" ·")
+    core_desc = re.sub(r"★\s*[\d,]+", "", core_desc).strip(" ·")
 
-    parts = [f"語言：{language}"]
-    if stars_today_match:
-        parts.append(f"今日星數：{stars_today_match.group(1)}")
-    if total_stars_match:
-        parts.append(f"累積星數：{total_stars_match.group(1)}")
+    if core_desc and core_desc != "(no description)":
+        return repo_name, _shorten_text(core_desc, 60)
 
-    topics = _extract_topics(f"{repo_name} {core_desc}")
+    language_match = re.search(r"\[([^\]]+)\]\s*$", title)
+    language = language_match.group(1) if language_match else "未知"
+    topics = _extract_topics(repo_name)
     if topics:
-        parts.append(f"主題：{'、'.join(topics)}")
-    elif core_desc:
-        parts.append("主題：開發工具 / 專案趨勢")
-
-    return repo_name, "；".join(parts) + "。"
+        return repo_name, f"與{'、'.join(topics)}相關的 {language} 專案。"
+    return repo_name, f"{language} 專案。"
 
 
 def _ai_item_to_zh(item: NewsItem) -> tuple[str, str]:

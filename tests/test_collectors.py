@@ -123,10 +123,9 @@ def test_simple_summarize_zh_github_formats_metadata(monkeypatch):
     sections = simple_summarize([], [item], [])
     text = sections["GitHub 熱門趨勢"]
 
-    assert "語言：Python" in text
-    assert "今日星數：638" in text
-    assert "累積星數：3,088" in text
-    assert "practical Codex skills" not in text
+    assert "語言：Python" not in text
+    assert "今日星數：" not in text
+    assert "Codex skills" in text
 
 
 def test_clean_description_decodes_html_entities():
@@ -163,6 +162,21 @@ def test_simple_summarize_dedupes_repeated_titles(monkeypatch):
 
     text = simple_summarize(items, [], [])["社群 / Twitter"]
     assert text.count("OpenAI：GPT-5.5 / GPT-5.5 Pro 更新") == 1
+
+
+def test_simple_summarize_github_uses_simple_repo_description(monkeypatch):
+    monkeypatch.setattr(simple_summarizer.config, "SUMMARY_LANGUAGE", "zh-TW")
+    item = NewsItem(
+        title="microsoft/VibeVoice [Python]",
+        url="https://github.com/microsoft/VibeVoice",
+        source="GitHub Trending",
+        description="An open-source frontier speech AI project for reproducible emotional voice generation. · 757 stars today ★43,506",
+    )
+
+    text = simple_summarize([], [item], [])["GitHub 熱門趨勢"]
+    assert "語言：" not in text
+    assert "今日星數：" not in text
+    assert "open-source frontier speech AI project" in text
 
 
 def test_filter_recent_items_keeps_only_last_24_hours():
