@@ -9,6 +9,10 @@ title: Daily News Digest
 
 Source repo: [matthiola0/daily-news-digest](https://github.com/matthiola0/daily-news-digest)
 
+## 2026 年 六月
+
+- [2026-06-01](/archives/2026/06/digest_01.md) — 每日新聞摘要 — 2026-06-01
+
 ## 2026 年 五月
 
 - [2026-05-31](/archives/2026/05/digest_31.md) — 每日新聞摘要 — 2026-05-31
