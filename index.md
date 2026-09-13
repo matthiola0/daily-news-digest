@@ -11,6 +11,7 @@ Source repo: [matthiola0/daily-news-digest](https://github.com/matthiola0/daily-
 
 ## 2026 年 九月
 
+- [2026-09-13](/archives/2026/09/digest_13.md) — 每日新聞摘要 — 2026-09-13
 - [2026-09-12](/archives/2026/09/digest_12.md) — 每日新聞摘要 — 2026-09-12
 - [2026-09-11](/archives/2026/09/digest_11.md) — 每日新聞摘要 — 2026-09-11
 - [2026-09-10](/archives/2026/09/digest_10.md) — 每日新聞摘要 — 2026-09-10
